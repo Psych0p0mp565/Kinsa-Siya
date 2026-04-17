@@ -12,6 +12,7 @@
   "scripts": {
     "render:build": "npm ci && npm run build -w shared && npm run build -w server",
     "render:start": "node server/dist/index.js",
+    "pages:build": "npm run build -w shared && npm run build -w client",
     "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
     "dev": "npm run build -w shared && concurrently -n shared,server,client -c blue,green,magenta \"npm run dev -w shared\" \"npm run dev -w server\" \"npm run dev -w client\"",
     "dev:quick": "concurrently -n server,client -c green,magenta \"npm run dev -w server\" \"npm run dev -w client\"",

@@ -17,7 +17,7 @@ That means **Node.js is not installed** or **not on your PATH** for this termina
 Optional helper (searches common install paths, then installs + builds `shared`):
 
 ```powershell
-cd "D:\GAMES\Who is it"
+cd "D:\GAMES\Kinsa Siya"
 powershell -ExecutionPolicy Bypass -File .\scripts\install-deps.ps1
 ```
 
@@ -92,16 +92,37 @@ See also [`client/.env.example`](client/.env.example).
    - **Root directory:** repository root (where `package.json` lives).
    - **Build command:** `npm run render:build`
    - **Start command:** `npm run render:start`
-4. After the first deploy, open the service URL (e.g. `https://sino-ito-api.onrender.com`) and confirm `GET /health` returns JSON.
+4. After the first deploy, open the service URL (e.g. `https://kinsa-siya.onrender.com`) and confirm `GET /health` returns JSON. In the service settings, set **Health Check Path** to `/health` if the field is empty.
 5. In **Environment**, set **`CLIENT_ORIGINS`** to the **exact origin(s)** of your game UI (scheme + host + port if any), comma-separated if you have more than one. Examples:
-   - UI on Render static site: `https://sino-ito-web.onrender.com`
-   - UI on Cloudflare Pages: `https://your-game.pages.dev`
+   - UI on Render static site: `https://your-game.onrender.com`
+   - UI on Cloudflare Pages: `https://kinsa-siya.pages.dev`
    - Include `http://localhost:5173` only if you still test locally against this same API.
-6. **Build the client** with your API URL, then host `client/dist` anywhere static:
+6. **Host the UI** (Cloudflare Pages or any static host). The client must be built with **`VITE_SERVER_URL`** pointing at your **Render API** (no trailing slash).
+
+### Cloudflare Pages (monorepo root)
+
+In the Pages project → **Settings → Environment variables** (Production), add:
+
+| Variable | Example value |
+|----------|----------------|
+| `NODE_VERSION` | `20` |
+| `VITE_SERVER_URL` | `https://kinsa-siya.onrender.com` |
+
+In **Settings → Builds & deployments**:
+
+| Field | Value |
+|--------|--------|
+| **Root directory** | `/` (repository root) |
+| **Build command** | `npm run pages:build` |
+| **Build output directory** | `client/dist` |
+
+Cloudflare runs `npm install` at the root first; the `pages:build` script builds `shared` then `client`. Redeploy after changing `VITE_SERVER_URL`.
+
+**Local build** then upload `client/dist` if you prefer not to use Pages CI:
 
 ```bash
 npm run build -w shared
-set VITE_SERVER_URL=https://YOUR-SERVICE.onrender.com
+set VITE_SERVER_URL=https://kinsa-siya.onrender.com
 npm run build -w client
 ```
 

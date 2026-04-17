@@ -6,10 +6,10 @@
 
 services:
   - type: web
-    name: sino-ito-api
+    name: kinsa-siya-api
     runtime: node
     plan: free
-    region: oregon
+    region: singapore
     buildCommand: npm run render:build
     startCommand: npm run render:start
     healthCheckPath: /health
