@@ -24,4 +24,10 @@ describe("buildRoster", () => {
   it("produces 24 characters", () => {
     expect(buildRoster("x", "celebrities")).toHaveLength(24);
   });
+
+  it("celebrity boards have 24 unique portrait subjects per seed", () => {
+    const r = buildRoster("pool-test-seed", "celebrities");
+    const names = new Set(r.map((c) => c.displayName));
+    expect(names.size).toBe(24);
+  });
 });

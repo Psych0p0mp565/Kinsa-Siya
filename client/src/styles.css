@@ -330,6 +330,19 @@ body::before {
   color: #e9d5ff;
 }
 
+.offlineBanner {
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  border-color: #38bdf8;
+  background: linear-gradient(165deg, rgba(14, 116, 144, 0.35) 0%, rgba(45, 27, 78, 0.92) 100%);
+  box-shadow: var(--shadow-pop), 0 0 20px rgba(56, 189, 248, 0.2);
+}
+
+.offlineBanner .muted {
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
 .card--alert {
   border-color: #fb7185;
   background: linear-gradient(165deg, rgba(136, 19, 55, 0.55) 0%, rgba(45, 27, 78, 0.96) 100%);

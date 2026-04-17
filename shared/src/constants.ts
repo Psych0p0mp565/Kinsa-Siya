@@ -19,7 +19,8 @@ export const SOCKET_EVENTS = {
 } as const;
 
 export const THEME_LABELS: Record<ThemeId, string> = {
-  celebrities: "Celebrities",
+  // themeId stays `celebrities` for compatibility; UI label = historic PD portraits, not a tabloid roster.
+  celebrities: "Historic icons (PD portraits)",
   government: "Government officials",
   cartoons: "Cartoon crew",
 };

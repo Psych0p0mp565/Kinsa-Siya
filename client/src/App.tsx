@@ -326,6 +326,19 @@ export function App() {
 
   const connected = socket.connected;
 
+  const [netOffline, setNetOffline] = useState(() =>
+    typeof navigator !== "undefined" ? !navigator.onLine : false,
+  );
+  useEffect(() => {
+    const sync = () => setNetOffline(!navigator.onLine);
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+    return () => {
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
+    };
+  }, []);
+
   return (
     <div className={`appShell${bootIntro ? " appShell--boot" : ""}`}>
       <OnboardingModal open={showOnboarding} onClose={() => setShowOnboarding(false)} />
@@ -341,6 +354,15 @@ export function App() {
         <h1 className="brandHero__title">Kinsa Siya?</h1>
         <p className="brandHero__tagline">Silly faces, secret picks, big brain questions — one of you walks away bragging.</p>
       </header>
+
+      {netOffline ? (
+        <div className="card offlineBanner" role="status">
+          <strong>No network.</strong>{" "}
+          <span className="muted">
+            If you installed this app, it can still open from cache. Starting or joining a match needs internet again—reconnect when you can.
+          </span>
+        </div>
+      ) : null}
 
       {error ? (
         <div className="card card--alert stack" style={{ marginBottom: 12 }}>
@@ -754,6 +776,11 @@ export function App() {
               <option value="cartoons">{THEME_LABELS.cartoons}</option>
             </select>
           </div>
+          {themeId === "celebrities" ? (
+            <p className="muted" style={{ fontSize: "0.9rem", lineHeight: 1.45, margin: 0 }}>
+              Each match shows <strong>24</strong> historic figures from a larger PD portrait pool — not a complete “modern celebrity” set (rights and hotlinking). Missing or blocked images fall back to cartoon-style avatars.
+            </p>
+          ) : null}
           <div className="row">
             <label className="muted">Energy level</label>
             <select value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)}>
@@ -847,7 +874,8 @@ export function App() {
           </div>
           <div className="muted">Voice mode loves headphones — grab a pair if you can.</div>
           <p className="muted privacyBlurb">
-            <strong>Cartoon crew</strong> is procedural art. <strong>Celebrities</strong> / <strong>Government officials</strong> use Wikimedia Commons portrait links (public-domain or federal work where noted on each file page)—not scraped social photos. Match chatter isn’t kept as a transcript; we only sync the game state for your room.
+            <strong>Cartoon crew</strong> is procedural art. <strong>Historic icons</strong> (PD portraits) / <strong>Government officials</strong> use Wikimedia Commons links
+            (public-domain or federal work where noted on each file page)—not a full tabloid roster or scraped social photos. Match chatter isn’t kept as a transcript; we only sync the game state for your room.
           </p>
           <button type="button" className="btn-ghost" onClick={() => void copyDebugInfo()}>
             Copy debug info for bug reports

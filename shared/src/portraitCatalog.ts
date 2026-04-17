@@ -67,10 +67,52 @@ export const CELEBRITY_FACES: readonly PortraitEntry[] = [
   { displayName: "Johannes Brahms", commonsFile: "JohannesBrahms1853.jpg" },
   { displayName: "Pyotr Ilyich Tchaikovsky", commonsFile: "Tchaikovsky 1876.jpg" },
   { displayName: "Claude Monet", commonsFile: "Claude Monet 1899 Nadar.jpg" },
+  { displayName: "Marie Curie", commonsFile: "Marie Curie c1920.jpg" },
+  { displayName: "Nikola Tesla", commonsFile: "Nikola Tesla, c.1896.jpg" },
+  { displayName: "Albert Einstein", commonsFile: "Albert Einstein Head.jpg" },
+  { displayName: "George Washington", commonsFile: "Gilbert Stuart Williamstown Portrait of George Washington.jpg" },
+  { displayName: "Winston Churchill", commonsFile: "Churchill HU 90973.jpg" },
+  { displayName: "Jane Austen", commonsFile: "Jane Austen, from A Memoir of Jane Austen (1870).jpg" },
+  { displayName: "Lewis Carroll", commonsFile: "LewisCarrollSelfPhoto.jpg" },
+  { displayName: "Galileo Galilei", commonsFile: "Justus Sustermans - Portrait of Galileo Galilei, 1636.jpg" },
+  { displayName: "Isaac Newton", commonsFile: "GodfreyKneller-IsaacNewton-1689.jpg" },
+  { displayName: "Helen Keller", commonsFile: "Helen Keller.jpg" },
+  { displayName: "Sigmund Freud", commonsFile: "Sigmund Freud, by Max Halberstadt (cropped).jpg" },
 ] as const;
 
-if (GOVERNMENT_OFFICIALS.length !== BOARD_SIZE || CELEBRITY_FACES.length !== BOARD_SIZE) {
-  throw new Error("portraitCatalog: expected BOARD_SIZE portrait entries per theme");
+if (GOVERNMENT_OFFICIALS.length !== BOARD_SIZE) {
+  throw new Error("portraitCatalog: government pack must have BOARD_SIZE entries");
+}
+if (CELEBRITY_FACES.length < BOARD_SIZE) {
+  throw new Error("portraitCatalog: celebrity pool must have at least BOARD_SIZE entries");
+}
+
+/** Each match uses BOARD_SIZE portraits; when the pool is larger, pick a deterministic subset per rosterSeed. */
+const celebrityPackCache = new Map<string, readonly PortraitEntry[]>();
+
+function resolvedCelebrityPack(rosterSeed: string): readonly PortraitEntry[] {
+  const hit = celebrityPackCache.get(rosterSeed);
+  if (hit) return hit;
+
+  if (CELEBRITY_FACES.length === BOARD_SIZE) {
+    celebrityPackCache.set(rosterSeed, CELEBRITY_FACES);
+    return CELEBRITY_FACES;
+  }
+
+  const rng = mulberry32(hashStringToSeed(`${rosterSeed}|celebritySubset`));
+  const n = CELEBRITY_FACES.length;
+  const idx = Array.from({ length: n }, (_, i) => i);
+  for (let i = 0; i < BOARD_SIZE; i++) {
+    const j = i + pickInt(rng, n - i);
+    const a = idx[i]!;
+    const b = idx[j]!;
+    idx[i] = b;
+    idx[j] = a;
+  }
+  const picked = idx.slice(0, BOARD_SIZE).map((i) => CELEBRITY_FACES[i]!);
+  celebrityPackCache.set(rosterSeed, picked);
+  if (celebrityPackCache.size > 400) celebrityPackCache.clear();
+  return picked;
 }
 
 export function wikimediaCommonsPortraitUrl(commonsFile: string, width = 360): string {
@@ -96,7 +138,11 @@ export function portraitForCharacter(
   slotIndex: number,
 ): { displayName: string; portraitUrl: string } | null {
   const pack =
-    themeId === "government" ? GOVERNMENT_OFFICIALS : themeId === "celebrities" ? CELEBRITY_FACES : null;
+    themeId === "government"
+      ? GOVERNMENT_OFFICIALS
+      : themeId === "celebrities"
+        ? resolvedCelebrityPack(rosterSeed)
+        : null;
   if (!pack) return null;
   const pi = slotToPortraitIndex(rosterSeed, themeId, slotIndex);
   const entry = pack[pi]!;

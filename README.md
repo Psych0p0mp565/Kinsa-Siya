@@ -2,6 +2,15 @@
 
 Two players in a browser: procedural cartoon roster (no real photos), Standard or Hard mode, room codes, and optional WebRTC voice in Hard mode.
 
+## Progressive Web App (offline-friendly shell)
+
+The **client build is a PWA**: after you open the deployed site once, the browser can **cache** the game UI (and Google Fonts). You can **Install** or **Add to Home Screen** (Chrome / Edge / Android; Safari on iOS supports “Add to Home Screen” with limitations).
+
+- **Offline**: the **app shell** loads without network; you can read the lobby and see that you’re disconnected.
+- **Online**: **creating/joining rooms, Socket.IO, and WebRTC** still need the internet and your game server. There is no local two-player or AI mode in this repo yet.
+
+Production must be served over **HTTPS** (e.g. Cloudflare Pages) so the service worker is allowed to register.
+
 ## Requirements
 
 - Node.js 20+ and npm
@@ -166,12 +175,12 @@ npm run test:e2e
 3. Each player picks a secret character, then take turns asking (Standard: typed/voice + Yes/No/Not sure; Hard: live call + voice answer lock-in).
 4. Flip tiles manually on your own board; guess ends the match (wrong guess loses).
 
-## Portrait images (Celebrities & Government officials)
+## Portrait images (Historic icons & Government officials)
 
 Those two themes show **real historical or official photographs** served from **Wikimedia Commons** (`Special:FilePath` URLs). They are **not** generated in-game, and this repo does **not** scrape Instagram, Getty, or other rights-managed celebrity feeds.
 
 - **Government officials** — mostly U.S. Senate official portraits, typically marked **PD-USGov** on Commons.
-- **Celebrities** — here means **widely known historic figures** with **old portrait photos or paintings** commonly treated as public domain on Commons (authors, composers, early cinema, etc.). It is **not** a roster of living tabloid “celebrities,” because that would require separate image licenses and publicity-rights clearance.
+- **Historic icons** (theme id `celebrities`) — each board uses **24** faces chosen from a **curated pool** of **public-domain or clearly PD-style portraits** on Wikimedia Commons (authors, scientists, early cinema, etc.). The pool is **not** trying to be a complete catalog of everyone famous today: modern red‑carpet or rights‑managed photos are out of scope for a small hobby project, and publicity rights matter for living figures. If you want more variety, add vetted `commonsFile` entries in `shared/src/portraitCatalog.ts` (larger pool ⇒ more mix per match).
 
 If a Commons file moves or blocks hotlinking, the tile **falls back** to the procedural SVG avatar. Each file’s license and attribution live on its Wikimedia file page.
 

@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference types="vite-plugin-pwa/client" />
 
 interface ImportMetaEnv {
   /** Public Socket.IO / API origin, e.g. https://api.example.com (omit for local Vite proxy). */
