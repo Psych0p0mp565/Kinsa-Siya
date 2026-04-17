@@ -1,4 +1,4 @@
-# Sino Ito? — Filipino-themed Guess Who (online)
+# Kinsa Siya? — Filipino-themed Guess Who (online)
 
 Two players in a browser: procedural cartoon roster (no real photos), Standard or Hard mode, room codes, and optional WebRTC voice in Hard mode.
 
@@ -46,6 +46,14 @@ If `shared` is already built, you can use:
 ```bash
 npm run dev:quick
 ```
+
+When port **3001** keeps getting stuck (`EADDRINUSE`) because multiple dev runs are fighting, prefer a **one-shot shared build** then only server + client:
+
+```bash
+npm run dev:stable
+```
+
+Then open **http://localhost:5173/** once the terminal shows the server listening on `3001`.
 
 ### Environment
 
@@ -142,6 +150,13 @@ See also [`render.yaml`](render.yaml).
 
 ```bash
 npm test
+```
+
+Browser smoke (starts `npm run dev:stable` unless a dev server is already up):
+
+```bash
+npx playwright install
+npm run test:e2e
 ```
 
 ## How to play

@@ -137,16 +137,22 @@ export function VoiceCall({
 
   return (
     <div className="callStrip">
-      <span className="badge">Live call</span>
+      <span className="badge">You’re live!</span>
       <span className="muted">
-        {status === "connecting" ? "Connecting…" : status === "connected" ? "Connected" : status === "failed" ? "Call issue — try headphones / check mic" : "Off"}
+        {status === "connecting"
+          ? "Linking you up…"
+          : status === "connected"
+            ? "You’re in!"
+            : status === "failed"
+              ? "Hmm — try headphones or check the mic"
+              : "Off"}
       </span>
       <button type="button" onClick={() => setMuted((m) => !m)} disabled={status !== "connected"}>
         {muted ? "Unmute" : "Mute"}
       </button>
       <audio ref={remoteAudioRef} autoPlay playsInline />
       <span className="muted" style={{ fontSize: 12 }}>
-        Headphones recommended (echo + voice answers).
+        Headphones = way less echo · mute between turns if the room feels “bouncy”
       </span>
     </div>
   );

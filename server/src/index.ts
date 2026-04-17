@@ -2,7 +2,13 @@ import http from "node:http";
 import express, { type Request, type Response } from "express";
 import cors from "cors";
 import { Server, type Socket } from "socket.io";
-import { SOCKET_EVENTS, type AnswerValue, type Difficulty, type ThemeId } from "@guess-who/shared";
+import {
+  SOCKET_EVENTS,
+  normalizeAnswerLabels,
+  type AnswerValue,
+  type Difficulty,
+  type ThemeId,
+} from "@guess-who/shared";
 import { Room, RoomStore } from "./roomStore.js";
 
 const THEMES: ThemeId[] = ["celebrities", "government", "cartoons"];
@@ -30,6 +36,10 @@ app.get("/health", (_req: Request, res: Response) => res.json({ ok: true }));
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: CORS_ORIGINS, methods: ["GET", "POST"], credentials: true },
+  /** Longer timeouts help proxies (e.g. Render) and cross-origin polling upgrades stay stable. */
+  pingTimeout: 120_000,
+  pingInterval: 25_000,
+  connectTimeout: 45_000,
 });
 
 const store = new RoomStore();
@@ -44,14 +54,36 @@ function err(socket: Socket, message: string) {
   socket.emit(SOCKET_EVENTS.error, { message });
 }
 
+function askQuestionErrorMessage(reason: string): string {
+  switch (reason) {
+    case "not_playing":
+      return "The match is not in play yet.";
+    case "ended":
+      return "This match is already over.";
+    case "not_your_turn":
+      return "Wait — it is not your turn to ask a question.";
+    case "question_pending":
+      return "A question is already waiting for an answer.";
+    case "empty_question":
+      return "Type a question before sending.";
+    default:
+      return reason;
+  }
+}
+
 io.on("connection", (socket: Socket) => {
-  socket.on(SOCKET_EVENTS.createRoom, (payload: { themeId: ThemeId; difficulty: Difficulty }) => {
-    const themeId = normalizeThemeId(payload?.themeId);
-    const difficulty: Difficulty = payload?.difficulty === "hard" ? "hard" : "standard";
-    const room = store.createRoom(themeId, difficulty, socket.id);
-    void socket.join(roomChannel(room.code));
-    broadcastRoom(room);
-  });
+  socket.on(
+    SOCKET_EVENTS.createRoom,
+    (payload: { themeId?: ThemeId; difficulty?: Difficulty; answerLabels?: unknown; useDailyBoard?: unknown }) => {
+      const themeId = normalizeThemeId(payload?.themeId);
+      const difficulty: Difficulty = payload?.difficulty === "hard" ? "hard" : "standard";
+      const answerLabels = normalizeAnswerLabels(payload?.answerLabels);
+      const useDailyBoard = Boolean(payload?.useDailyBoard);
+      const room = store.createRoom(themeId, difficulty, socket.id, answerLabels, useDailyBoard);
+      void socket.join(roomChannel(room.code));
+      broadcastRoom(room);
+    },
+  );
 
   socket.on(SOCKET_EVENTS.joinRoom, (payload: { code: string }) => {
     const code = String(payload?.code ?? "").toUpperCase();
@@ -80,7 +112,7 @@ io.on("connection", (socket: Socket) => {
     const slot = room.slotFor(socket.id);
     if (!slot) return err(socket, "No seat.");
     const res = room.askQuestion(slot, String(payload?.text ?? ""));
-    if (!res.ok) return err(socket, res.reason);
+    if (!res.ok) return err(socket, askQuestionErrorMessage(res.reason));
     broadcastRoom(room);
   });
 

@@ -5,3 +5,4 @@ export * from "./names.js";
 export * from "./roster.js";
 export * from "./avatarSvg.js";
 export * from "./answerPhrases.js";
+export * from "./answerLabels.js";

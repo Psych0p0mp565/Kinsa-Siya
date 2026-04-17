@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import {
+  type AnswerLabels,
   type AnswerValue,
   buildRoster,
   type Character,
@@ -20,15 +22,28 @@ function randomSeed(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/** Deterministic roster seed: same calendar day + theme ⇒ same faces worldwide. */
+function dailySeed(themeId: ThemeId): string {
+  const day = new Date().toISOString().slice(0, 10);
+  return createHash("sha256").update(`${day}|${themeId}`).digest("hex").slice(0, 40);
+}
+
 interface Player {
   socketId: string;
   slot: PlayerSlot;
 }
 
+export type RoomCreateOptions = {
+  answerLabels: AnswerLabels;
+  dailyBoard?: boolean;
+};
+
 export class Room {
   readonly code: string;
   themeId: ThemeId;
   difficulty: Difficulty;
+  answerLabels: AnswerLabels;
+  readonly dailyBoard: boolean;
   rosterSeed: string;
   roster: Character[];
   players: Player[] = [];
@@ -41,11 +56,13 @@ export class Room {
   reveal?: { p1SecretId: string; p2SecretId: string };
   lastGuess?: { guesser: PlayerSlot; characterId: string; correct: boolean };
 
-  constructor(themeId: ThemeId, difficulty: Difficulty) {
+  constructor(themeId: ThemeId, difficulty: Difficulty, opts: RoomCreateOptions) {
     this.code = randomRoomCode();
     this.themeId = themeId;
     this.difficulty = difficulty;
-    this.rosterSeed = randomSeed();
+    this.answerLabels = opts.answerLabels;
+    this.dailyBoard = Boolean(opts.dailyBoard);
+    this.rosterSeed = this.dailyBoard ? dailySeed(themeId) : randomSeed();
     this.roster = buildRoster(this.rosterSeed, this.themeId);
   }
 
@@ -142,7 +159,7 @@ export class Room {
   }
 
   rematch(): void {
-    this.rosterSeed = randomSeed();
+    this.rosterSeed = this.dailyBoard ? dailySeed(this.themeId) : randomSeed();
     this.roster = buildRoster(this.rosterSeed, this.themeId);
     this.secrets = {};
     this.phase = this.players.length === 2 ? "setup" : "lobby";
@@ -171,12 +188,14 @@ export class Room {
         p2: Boolean(this.secrets.p2),
       },
       pendingQuestion: this.pendingQuestion,
+      answerLabels: this.answerLabels,
       qaHistory: this.difficulty === "standard" ? this.qaHistory : [],
       winner: this.winner,
       reveal: this.reveal,
       lastGuess: this.lastGuess,
       /** p2 is polite peer (sends WebRTC offer first) per plan sketch */
       webrtcPolite: yourSlot === "p2",
+      dailyBoard: this.dailyBoard,
     };
   }
 }
@@ -185,8 +204,8 @@ export class RoomStore {
   private rooms = new Map<string, Room>();
   private socketRoom = new Map<string, string>();
 
-  createRoom(themeId: ThemeId, difficulty: Difficulty, hostSocketId: string): Room {
-    const room = new Room(themeId, difficulty);
+  createRoom(themeId: ThemeId, difficulty: Difficulty, hostSocketId: string, answerLabels: AnswerLabels, useDailyBoard?: boolean): Room {
+    const room = new Room(themeId, difficulty, { answerLabels, dailyBoard: useDailyBoard });
     room.addPlayer(hostSocketId);
     this.rooms.set(room.code, room);
     this.socketRoom.set(hostSocketId, room.code);

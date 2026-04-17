@@ -40,6 +40,8 @@ export interface PublicRoomState {
   secretsReady: { p1: boolean; p2: boolean };
   /** Pending question for answerer (Standard: has text; Hard: may be empty). */
   pendingQuestion?: { asker: PlayerSlot; text: string };
+  /** Button labels for Standard-mode answers (semantics stay yes / no / not_sure). */
+  answerLabels: Record<AnswerValue, string>;
   qaHistory: QARound[];
   /** Winner when ended. */
   winner?: PlayerSlot;
@@ -49,4 +51,6 @@ export interface PublicRoomState {
   lastGuess?: { guesser: PlayerSlot; characterId: string; correct: boolean };
   /** When true, this client should initiate WebRTC offer (joiner / p2). */
   webrtcPolite?: boolean;
+  /** Same face lineup for everyone hosting with “today’s deck” (UTC date + theme). */
+  dailyBoard?: boolean;
 }

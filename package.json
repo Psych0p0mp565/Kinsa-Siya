@@ -16,9 +16,12 @@
     "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
     "dev": "npm run build -w shared && concurrently -n shared,server,client -c blue,green,magenta \"npm run dev -w shared\" \"npm run dev -w server\" \"npm run dev -w client\"",
     "dev:quick": "concurrently -n server,client -c green,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
-    "test": "npm run test -w shared"
+    "dev:stable": "npm run build -w shared && npm run dev:quick",
+    "test": "npm run test -w shared",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "concurrently": "^9.1.2"
   }
 }

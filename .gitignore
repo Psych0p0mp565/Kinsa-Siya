@@ -8,3 +8,5 @@ dist/
 client/dist/
 server/dist/
 shared/dist/
+test-results/
+playwright-report/

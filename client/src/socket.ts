@@ -12,5 +12,7 @@ export function createSocket(): Socket {
     path: "/socket.io",
     transports: ["websocket", "polling"],
     autoConnect: true,
+    /** Matches server `credentials: true` for CORS when UI and API are on different origins (e.g. Pages → Render). */
+    withCredentials: true,
   });
 }
