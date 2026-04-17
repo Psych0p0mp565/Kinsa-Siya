@@ -615,6 +615,21 @@ h2 {
   margin-bottom: 12px;
 }
 
+.callStrip--toggle {
+  align-items: flex-start;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.callStrip--toggle input {
+  margin-top: 4px;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .history {
   max-height: 220px;
   overflow: auto;
@@ -1291,27 +1306,6 @@ html.game-no-scroll #root {
 
 .answerAnswerer {
   gap: 14px;
-}
-
-.answerTypeBox {
-  padding: 12px 14px;
-  border-radius: var(--radius-md);
-  border: 2px dashed rgba(167, 139, 250, 0.55);
-  background: rgba(15, 23, 42, 0.35);
-}
-
-.answerTypeBox__input {
-  width: 100%;
-  border-radius: 12px;
-  border: 2px solid rgba(129, 140, 248, 0.55);
-  padding: 12px 14px;
-  background: rgba(30, 27, 75, 0.85);
-  color: var(--text);
-  font-size: 1rem;
-}
-
-.answerTypeBox__input::placeholder {
-  color: rgba(196, 181, 224, 0.65);
 }
 
 .answerRow {

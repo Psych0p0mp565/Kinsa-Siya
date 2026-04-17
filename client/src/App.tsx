@@ -97,11 +97,12 @@ export function App() {
   const [guessPick, setGuessPick] = useState<string | null>(null);
   const [guessMode, setGuessMode] = useState(false);
   const [questionText, setQuestionText] = useState("");
-  const [typedAnswer, setTypedAnswer] = useState("");
   const [speechBusy, setSpeechBusy] = useState(false);
   const voiceCallRef = useRef<VoiceCallHandle>(null);
   const [hardVoiceDcOpen, setHardVoiceDcOpen] = useState(false);
   const [hardVoiceClipUrl, setHardVoiceClipUrl] = useState<string | null>(null);
+  /** Classic mode: opt-in live mic (WebRTC); both players should enable to connect. */
+  const [standardVoiceChat, setStandardVoiceChat] = useState(false);
 
   const prevQaLen = useRef(0);
   const lastRecordedEnd = useRef<string | null>(null);
@@ -115,7 +116,6 @@ export function App() {
 
   useEffect(() => {
     if (!view?.pendingQuestion) {
-      setTypedAnswer("");
       setHardVoiceClipUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return null;
@@ -132,7 +132,6 @@ export function App() {
     setGuessPick(null);
     setGuessMode(false);
     setQuestionText("");
-    setTypedAnswer("");
     setRematchCount(null);
     lastRecordedEnd.current = null;
     prevQaLen.current = 0;
@@ -289,7 +288,14 @@ export function App() {
     setMySecretId(null);
     setGuessPick(null);
     setGuessMode(false);
+    setStandardVoiceChat(false);
   }
+
+  useEffect(() => {
+    if (!view || view.phase !== "playing" || view.difficulty !== "standard") {
+      setStandardVoiceChat(false);
+    }
+  }, [view, view?.phase, view?.difficulty]);
 
   function onTileClick(characterId: string) {
     if (!view) return;
@@ -435,19 +441,38 @@ export function App() {
           {view.phase === "playing" || view.phase === "ended" ? (
             <div className="roomGameLayout">
               <div className="roomGameLayout__rail stack">
-                {view.difficulty === "hard" && view.phase === "playing" ? (
+                {view.phase === "playing" && view.difficulty === "standard" ? (
+                  <label className="callStrip callStrip--toggle row">
+                    <input
+                      type="checkbox"
+                      checked={standardVoiceChat}
+                      onChange={(e) => setStandardVoiceChat(e.target.checked)}
+                    />
+                    <span className="muted muted--tight">
+                      <strong>Voice chat</strong> — live mic with your friend (optional). Turn this on <em>both</em> sides so the call can connect.
+                    </span>
+                  </label>
+                ) : null}
+
+                {view.phase === "playing" &&
+                (view.difficulty === "hard" || (view.difficulty === "standard" && standardVoiceChat)) ? (
                   <VoiceCall
                     ref={voiceCallRef}
                     socket={socket}
                     enabled={true}
                     polite={Boolean(view.webrtcPolite)}
-                    onVoiceClipChannel={setHardVoiceDcOpen}
-                    onVoiceClip={(url) => {
-                      setHardVoiceClipUrl((prev) => {
-                        if (prev) URL.revokeObjectURL(prev);
-                        return url;
-                      });
-                    }}
+                    variant={view.difficulty === "standard" ? "chatOnly" : "full"}
+                    onVoiceClipChannel={view.difficulty === "hard" ? setHardVoiceDcOpen : undefined}
+                    onVoiceClip={
+                      view.difficulty === "hard"
+                        ? (url) => {
+                            setHardVoiceClipUrl((prev) => {
+                              if (prev) URL.revokeObjectURL(prev);
+                              return url;
+                            });
+                          }
+                        : undefined
+                    }
                   />
                 ) : null}
 
@@ -484,7 +509,7 @@ export function App() {
                       <p className="pendingQuestion__text">{view.pendingQuestion.text}</p>
                     </div>
                     {isAnswerer ? (
-                      <p className="pendingQuestion__hint">Type your reply in the answer panel (next card), or use the three big buttons.</p>
+                      <p className="pendingQuestion__hint">Use the three big buttons in the next card — or voice chat if you both turned it on.</p>
                     ) : isPendingAsker ? (
                       <WaitOpponent compact title="They’re thinking…" hint="They’re picking how to roast your question." />
                     ) : (
@@ -527,58 +552,13 @@ export function App() {
                         </div>
                       </div>
                     ) : isAnswerer ? (
-                      <div className="muted muted--tight">Your spotlight — type below or tap a button.</div>
+                      <div className="muted muted--tight">Your spotlight — tap a button to answer.</div>
                     ) : (
                       <WaitOpponent compact title="Their turn to ask" hint="They’re cooking up something sneaky." />
                     )}
 
                     {isAnswerer ? (
                       <div className="stack answerAnswerer">
-                        <div className="answerTypeBox stack">
-                          <label className="muted muted--tight" htmlFor="typed-answer-input">
-                            Type your answer (same meaning as the buttons)
-                          </label>
-                          <input
-                            id="typed-answer-input"
-                            className="answerTypeBox__input"
-                            type="text"
-                            value={typedAnswer}
-                            onChange={(e) => setTypedAnswer(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                const parsed = parseAnswerFromSpeech(typedAnswer);
-                                if (!parsed) {
-                                  window.alert("Try yes, no, not sure — or Oo, Hindi, Hindi ko alam.");
-                                  return;
-                                }
-                                socket.emit(SOCKET_EVENTS.answer, { value: parsed });
-                                setTypedAnswer("");
-                              }
-                            }}
-                            placeholder="e.g. yes, no, maybe, Oo, Hindi, Hindi ko alam…"
-                            autoComplete="off"
-                            aria-label="Type your yes or no answer"
-                          />
-                          <div className="row">
-                            <button
-                              type="button"
-                              className="primary"
-                              disabled={!typedAnswer.trim()}
-                              onClick={() => {
-                                const parsed = parseAnswerFromSpeech(typedAnswer);
-                                if (!parsed) {
-                                  window.alert("Try yes, no, not sure — or Oo, Hindi, Hindi ko alam.");
-                                  return;
-                                }
-                                socket.emit(SOCKET_EVENTS.answer, { value: parsed });
-                                setTypedAnswer("");
-                              }}
-                            >
-                              Send typed answer
-                            </button>
-                          </div>
-                        </div>
                         <div className="row answerRow">
                           <button type="button" className="primary answerBtn" onClick={() => socket.emit(SOCKET_EVENTS.answer, { value: "yes" })}>
                             {view.answerLabels.yes}

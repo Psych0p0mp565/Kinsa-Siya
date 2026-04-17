@@ -41,12 +41,14 @@ export const VoiceCall = forwardRef<
     socket: Socket;
     enabled: boolean;
     polite: boolean;
+    /** "full" = voice duel (clips + hint). "chatOnly" = Classic optional live mic. */
+    variant?: "full" | "chatOnly";
     /** Called when a full voice clip arrives from the peer (object URL — revoke when done). */
     onVoiceClip?: (objectUrl: string) => void;
     /** Fires when the peer-to-peer voice-clip channel opens or closes. */
     onVoiceClipChannel?: (open: boolean) => void;
   }
->(function VoiceCall({ socket, enabled, polite, onVoiceClip, onVoiceClipChannel }, ref) {
+>(function VoiceCall({ socket, enabled, polite, variant = "full", onVoiceClip, onVoiceClipChannel }, ref) {
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -259,9 +261,14 @@ export const VoiceCall = forwardRef<
 
   if (!enabled) return null;
 
+  const foot =
+    variant === "chatOnly"
+      ? "Headphones = less echo · mute when you’re not talking · both players need this on to connect"
+      : "Headphones = way less echo · mute between turns if the room feels “bouncy” · voice clips use the same peer link (no typing)";
+
   return (
     <div className="callStrip">
-      <span className="badge">You’re live!</span>
+      <span className="badge">{variant === "chatOnly" ? "Voice chat" : "You’re live!"}</span>
       <span className="muted">
         {status === "connecting"
           ? "Linking you up…"
@@ -276,7 +283,7 @@ export const VoiceCall = forwardRef<
       </button>
       <audio ref={remoteAudioRef} autoPlay playsInline />
       <span className="muted" style={{ fontSize: 12 }}>
-        Headphones = way less echo · mute between turns if the room feels “bouncy” · voice clips use the same peer link (no typing)
+        {foot}
       </span>
     </div>
   );
