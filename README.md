@@ -166,6 +166,17 @@ npm run test:e2e
 3. Each player picks a secret character, then take turns asking (Standard: typed/voice + Yes/No/Not sure; Hard: live call + voice answer lock-in).
 4. Flip tiles manually on your own board; guess ends the match (wrong guess loses).
 
+## Portrait images (Celebrities & Government officials)
+
+Those two themes show **real historical or official photographs** served from **Wikimedia Commons** (`Special:FilePath` URLs). They are **not** generated in-game, and this repo does **not** scrape Instagram, Getty, or other rights-managed celebrity feeds.
+
+- **Government officials** — mostly U.S. Senate official portraits, typically marked **PD-USGov** on Commons.
+- **Celebrities** — here means **widely known historic figures** with **old portrait photos or paintings** commonly treated as public domain on Commons (authors, composers, early cinema, etc.). It is **not** a roster of living tabloid “celebrities,” because that would require separate image licenses and publicity-rights clearance.
+
+If a Commons file moves or blocks hotlinking, the tile **falls back** to the procedural SVG avatar. Each file’s license and attribution live on its Wikimedia file page.
+
+This game is **not** affiliated with or endorsed by Hasbro’s *Guess Who?* brand; the board layout is only a familiar game pattern.
+
 ## License
 
 Private project — use at your own discretion.

@@ -12,6 +12,8 @@ export interface Character {
   themeId: ThemeId;
   seed: number;
   displayName: string;
+  /** Wikimedia Commons portrait URL (Celebrities / Government themes). */
+  portraitUrl?: string;
 }
 
 export interface QARound {

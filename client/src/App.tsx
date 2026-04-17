@@ -718,7 +718,7 @@ export function App() {
           </div>
           <div className="muted">Voice mode loves headphones — grab a pair if you can.</div>
           <p className="muted privacyBlurb">
-            Cartoon faces only — not real IDs. Match chatter isn’t kept as a transcript; we only sync the game state for your room.
+            <strong>Cartoon crew</strong> is procedural art. <strong>Celebrities</strong> / <strong>Government officials</strong> use Wikimedia Commons portrait links (public-domain or federal work where noted on each file page)—not scraped social photos. Match chatter isn’t kept as a transcript; we only sync the game state for your room.
           </p>
           <button type="button" className="btn-ghost" onClick={() => void copyDebugInfo()}>
             Copy debug info for bug reports

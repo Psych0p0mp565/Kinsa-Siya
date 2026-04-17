@@ -25,7 +25,8 @@ export function OnboardingModal({ open, onClose }: { open: boolean; onClose: () 
           </li>
         </ul>
         <p className="muted" style={{ fontSize: "0.9rem" }}>
-          Faces are silly generated art — not real people. Nothing you type is stored on our servers after the match.
+          <strong>Cartoon crew</strong> uses goofy generated mugshots. <strong>Celebrities</strong> and <strong>Government officials</strong> load curated public-domain
+          portraits from Wikimedia Commons (not paparazzi or random web scraping). Nothing you type is stored on our servers after the match.
         </p>
         <div className="row" style={{ justifyContent: "flex-end" }}>
           <button

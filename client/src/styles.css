@@ -442,6 +442,16 @@ body::before {
   border-radius: 12px 12px 0 0;
 }
 
+.tilePortrait {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 12px 12px 0 0;
+  background: #1e1b4b;
+}
+
 .tile:hover {
   transform: translateY(-4px) scale(1.02);
   box-shadow: 0 8px 0 rgba(0, 0, 0, 0.2);

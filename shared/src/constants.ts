@@ -19,7 +19,7 @@ export const SOCKET_EVENTS = {
 } as const;
 
 export const THEME_LABELS: Record<ThemeId, string> = {
-  celebrities: "Stars & idols",
-  government: "Big shots",
+  celebrities: "Celebrities",
+  government: "Government officials",
   cartoons: "Cartoon crew",
 };

@@ -14,6 +14,13 @@ describe("buildRoster", () => {
     expect(celeb[0]!.displayName).not.toEqual(gov[0]!.displayName);
   });
 
+  it("uses Wikimedia portrait URLs for celebrities and government", () => {
+    const celeb = buildRoster("portrait-seed", "celebrities");
+    const gov = buildRoster("portrait-seed", "government");
+    expect(celeb.every((c) => c.portraitUrl?.includes("wikimedia.org"))).toBe(true);
+    expect(gov.every((c) => c.portraitUrl?.includes("wikimedia.org"))).toBe(true);
+  });
+
   it("produces 24 characters", () => {
     expect(buildRoster("x", "celebrities")).toHaveLength(24);
   });
