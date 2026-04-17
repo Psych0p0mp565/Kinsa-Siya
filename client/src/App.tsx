@@ -11,7 +11,7 @@ import {
 } from "@guess-who/shared";
 import { createSocket } from "./socket.js";
 import { AvatarTile } from "./components/AvatarTile.js";
-import { VoiceCall } from "./components/VoiceCall.js";
+import { VoiceCall, type VoiceCallHandle } from "./components/VoiceCall.js";
 import { WaitOpponent } from "./components/WaitOpponent.js";
 import { ConfettiLayer } from "./components/ConfettiLayer.js";
 import { OnboardingModal } from "./components/OnboardingModal.js";
@@ -24,6 +24,7 @@ import {
   saveSoundEnabled,
 } from "./lib/sounds.js";
 import { loadStats, recordMatchEnd } from "./lib/stats.js";
+import { recordVoiceClipAutoStop } from "./lib/recordVoiceClip.js";
 import { getSpeechRecognition, listenOnce } from "./speech.js";
 
 function useRoomState(socket: import("socket.io-client").Socket) {
@@ -96,7 +97,11 @@ export function App() {
   const [guessPick, setGuessPick] = useState<string | null>(null);
   const [guessMode, setGuessMode] = useState(false);
   const [questionText, setQuestionText] = useState("");
+  const [typedAnswer, setTypedAnswer] = useState("");
   const [speechBusy, setSpeechBusy] = useState(false);
+  const voiceCallRef = useRef<VoiceCallHandle>(null);
+  const [hardVoiceDcOpen, setHardVoiceDcOpen] = useState(false);
+  const [hardVoiceClipUrl, setHardVoiceClipUrl] = useState<string | null>(null);
 
   const prevQaLen = useRef(0);
   const lastRecordedEnd = useRef<string | null>(null);
@@ -109,6 +114,16 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (!view?.pendingQuestion) {
+      setTypedAnswer("");
+      setHardVoiceClipUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+    }
+  }, [view?.pendingQuestion]);
+
+  useEffect(() => {
     if (!view?.rosterSeed) return;
     setLocalDown({});
     setFlipUndo([]);
@@ -117,6 +132,7 @@ export function App() {
     setGuessPick(null);
     setGuessMode(false);
     setQuestionText("");
+    setTypedAnswer("");
     setRematchCount(null);
     lastRecordedEnd.current = null;
     prevQaLen.current = 0;
@@ -286,9 +302,17 @@ export function App() {
   }
 
   const connected = socket.connected;
+  const gameFitLayout = Boolean(
+    connected && view?.yourSlot && (view.phase === "setup" || view.phase === "playing" || view.phase === "ended"),
+  );
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("game-no-scroll", gameFitLayout);
+    return () => document.documentElement.classList.remove("game-no-scroll");
+  }, [gameFitLayout]);
 
   return (
-    <div className={`appShell${bootIntro ? " appShell--boot" : ""}`}>
+    <div className={`appShell${bootIntro ? " appShell--boot" : ""}${gameFitLayout ? " appShell--game" : ""}`}>
       <OnboardingModal open={showOnboarding} onClose={() => setShowOnboarding(false)} />
       <ConfettiLayer tick={confettiTick} />
       <div className="appShell__decor" aria-hidden="true">
@@ -297,7 +321,7 @@ export function App() {
         <span className="appShell__blob appShell__blob--c" />
       </div>
 
-      <header className="card card--hero brandHero">
+      <header className={`card card--hero brandHero${gameFitLayout ? " brandHero--compact" : ""}`}>
         <p className="brandHero__eyebrow">Play with a friend · online</p>
         <h1 className="brandHero__title">Kinsa Siya?</h1>
         <p className="brandHero__tagline">Silly faces, secret picks, big brain questions — one of you walks away bragging.</p>
@@ -316,7 +340,7 @@ export function App() {
       ) : null}
 
       {connected && view?.yourSlot ? (
-        <div className="card card--room stack">
+        <div className={`card card--room stack${gameFitLayout ? " card--room--fit" : ""}`}>
           <div className="roomBar row">
             <div className="roomBar__badges row">
               <span className="badge badge--glow">Room {view.roomCode}</span>{" "}
@@ -375,240 +399,341 @@ export function App() {
           ) : null}
 
           {view.phase === "setup" ? (
-            <div className="stack">
-              <h2 className="panelTitle">Pick your secret face</h2>
-              <div className="muted">Choose the one you’ll defend — they’ll try to guess who you picked.</div>
-              <div className="grid24">
-                {view.roster.map((c) => (
-                  <AvatarTile key={c.id} character={c} down={false} isSelf={setupPick === c.id} onClick={() => setSetupPick(c.id)} />
-                ))}
+            <div className="roomGameLayout roomGameLayout--setup">
+              <div className="roomGameLayout__rail stack">
+                <h2 className="panelTitle panelTitle--compact">Pick your secret face</h2>
+                <div className="muted muted--tight">Choose the one you’ll defend — they’ll try to guess who you picked.</div>
+                <div className="row">
+                  <button
+                    type="button"
+                    className="primary"
+                    disabled={!setupPick}
+                    onClick={() => {
+                      if (!setupPick) return;
+                      socket.emit(SOCKET_EVENTS.setSecret, { characterId: setupPick });
+                      setMySecretId(setupPick);
+                    }}
+                  >
+                    Lock it in!
+                  </button>
+                  {!view.secretsReady[view.yourSlot] ? <span className="muted">Tap yours first…</span> : null}
+                </div>
+                {!view.secretsReady[view.yourSlot === "p1" ? "p2" : "p1"] ? (
+                  <WaitOpponent compact title="They’re picking…" hint="Give them a sec — choosing a secret face is serious business." />
+                ) : null}
               </div>
-              <div className="row">
-                <button
-                  type="button"
-                  className="primary"
-                  disabled={!setupPick}
-                  onClick={() => {
-                    if (!setupPick) return;
-                    socket.emit(SOCKET_EVENTS.setSecret, { characterId: setupPick });
-                    setMySecretId(setupPick);
-                  }}
-                >
-                  Lock it in!
-                </button>
-                {!view.secretsReady[view.yourSlot] ? <span className="muted">Tap yours first…</span> : null}
+              <div className="roomGameLayout__board">
+                <div className="grid24 grid24--game">
+                  {view.roster.map((c) => (
+                    <AvatarTile key={c.id} character={c} down={false} isSelf={setupPick === c.id} onClick={() => setSetupPick(c.id)} />
+                  ))}
+                </div>
               </div>
-              {!view.secretsReady[view.yourSlot === "p1" ? "p2" : "p1"] ? (
-                <WaitOpponent compact title="They’re picking…" hint="Give them a sec — choosing a secret face is serious business." />
-              ) : null}
             </div>
           ) : null}
 
           {view.phase === "playing" || view.phase === "ended" ? (
-            <div className="stack">
-              {view.difficulty === "hard" && view.phase === "playing" ? (
-                <VoiceCall socket={socket} enabled={true} polite={Boolean(view.webrtcPolite)} />
-              ) : null}
+            <div className="roomGameLayout">
+              <div className="roomGameLayout__rail stack">
+                {view.difficulty === "hard" && view.phase === "playing" ? (
+                  <VoiceCall
+                    ref={voiceCallRef}
+                    socket={socket}
+                    enabled={true}
+                    polite={Boolean(view.webrtcPolite)}
+                    onVoiceClipChannel={setHardVoiceDcOpen}
+                    onVoiceClip={(url) => {
+                      setHardVoiceClipUrl((prev) => {
+                        if (prev) URL.revokeObjectURL(prev);
+                        return url;
+                      });
+                    }}
+                  />
+                ) : null}
 
-              {view.phase === "playing" && view.difficulty === "standard" && view.pendingQuestion ? (
-                <div className="card card--pendingQuestion stack" role="status">
-                  <div className="pendingQuestion__label">
-                    {isAnswerer ? "Incoming question!" : isPendingAsker ? "You fired this one" : "On the table"}
+                {view.phase === "playing" && view.difficulty === "hard" && view.pendingQuestion ? (
+                  <div className="card card--pendingQuestion stack" role="status">
+                    <div className="pendingQuestion__label">
+                      {isAnswerer ? "Voice clip incoming!" : isPendingAsker ? "Your voice clip" : "Voice round"}
+                    </div>
+                    <div className="pendingQuestion__body">
+                      {hardVoiceClipUrl ? (
+                        <audio className="hardVoiceClip" src={hardVoiceClipUrl} controls preload="metadata" />
+                      ) : (
+                        <p className="pendingQuestion__text muted" style={{ margin: 0 }}>
+                          {isAnswerer ? "Hang tight — their recording is hopping over the peer link." : "Clip channel is syncing…"}
+                        </p>
+                      )}
+                    </div>
+                    {isAnswerer ? (
+                      <p className="pendingQuestion__hint">Listen, then tap your answer — live call audio still works too.</p>
+                    ) : isPendingAsker ? (
+                      <WaitOpponent compact title="They’re listening…" hint="They’ll answer when they’re ready." />
+                    ) : (
+                      <p className="pendingQuestion__hint">Someone’s about to answer.</p>
+                    )}
                   </div>
-                  <div className="pendingQuestion__body">
-                    <p className="pendingQuestion__text">{view.pendingQuestion.text}</p>
-                  </div>
-                  {isAnswerer ? (
-                    <p className="pendingQuestion__hint">Smash one of the three big buttons — make ’em sweat.</p>
-                  ) : isPendingAsker ? (
-                    <WaitOpponent compact title="They’re thinking…" hint="They’re picking how to roast your question." />
-                  ) : (
-                    <p className="pendingQuestion__hint">Hang tight — someone’s about to answer.</p>
-                  )}
-                </div>
-              ) : null}
+                ) : null}
 
-              {view.phase === "playing" && view.difficulty === "standard" ? (
-                <div className="card card--panel stack">
-                  <h2 className="panelTitle">Your turn to ask</h2>
-                  {isPendingAsker ? (
-                    <div className="muted">Nice — after they answer, the mic’s theirs for the next round.</div>
-                  ) : isAsker ? (
-                    <div className="stack">
-                      <textarea rows={3} value={questionText} onChange={(e) => setQuestionText(e.target.value)} placeholder="Ask something they can answer with a yes or no…" />
+                {view.phase === "playing" && view.difficulty === "standard" && view.pendingQuestion ? (
+                  <div className="card card--pendingQuestion stack" role="status">
+                    <div className="pendingQuestion__label">
+                      {isAnswerer ? "Incoming question!" : isPendingAsker ? "You fired this one" : "On the table"}
+                    </div>
+                    <div className="pendingQuestion__body">
+                      <p className="pendingQuestion__text">{view.pendingQuestion.text}</p>
+                    </div>
+                    {isAnswerer ? (
+                      <p className="pendingQuestion__hint">Type your reply in the answer panel (next card), or use the three big buttons.</p>
+                    ) : isPendingAsker ? (
+                      <WaitOpponent compact title="They’re thinking…" hint="They’re picking how to roast your question." />
+                    ) : (
+                      <p className="pendingQuestion__hint">Hang tight — someone’s about to answer.</p>
+                    )}
+                  </div>
+                ) : null}
+
+                {view.phase === "playing" && view.difficulty === "standard" ? (
+                  <div className="card card--panel card--panelDense stack">
+                    <h2 className="panelTitle panelTitle--compact">Your turn to ask</h2>
+                    {isPendingAsker ? (
+                      <div className="muted muted--tight">Nice — after they answer, the mic’s theirs for the next round.</div>
+                    ) : isAsker ? (
+                      <div className="stack">
+                        <textarea
+                          rows={2}
+                          className="inputCompact"
+                          value={questionText}
+                          onChange={(e) => setQuestionText(e.target.value)}
+                          placeholder="Ask something they can answer with a yes or no…"
+                        />
+                        <div className="row">
+                          <button
+                            type="button"
+                            className="primary"
+                            disabled={!questionText.trim()}
+                            onClick={() => {
+                              const t = questionText.trim();
+                              if (!t) return;
+                              socket.emit(SOCKET_EVENTS.askQuestion, { text: t });
+                              setQuestionText("");
+                            }}
+                          >
+                            Send it!
+                          </button>
+                          <button type="button" disabled={speechBusy || !getSpeechRecognition()} onClick={onSpeechQuestion}>
+                            {speechBusy ? "Listening…" : "Say it out loud"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : isAnswerer ? (
+                      <div className="muted muted--tight">Your spotlight — type below or tap a button.</div>
+                    ) : (
+                      <WaitOpponent compact title="Their turn to ask" hint="They’re cooking up something sneaky." />
+                    )}
+
+                    {isAnswerer ? (
+                      <div className="stack answerAnswerer">
+                        <div className="answerTypeBox stack">
+                          <label className="muted muted--tight" htmlFor="typed-answer-input">
+                            Type your answer (same meaning as the buttons)
+                          </label>
+                          <input
+                            id="typed-answer-input"
+                            className="answerTypeBox__input"
+                            type="text"
+                            value={typedAnswer}
+                            onChange={(e) => setTypedAnswer(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                const parsed = parseAnswerFromSpeech(typedAnswer);
+                                if (!parsed) {
+                                  window.alert("Try yes, no, not sure — or Oo, Hindi, Hindi ko alam.");
+                                  return;
+                                }
+                                socket.emit(SOCKET_EVENTS.answer, { value: parsed });
+                                setTypedAnswer("");
+                              }
+                            }}
+                            placeholder="e.g. yes, no, maybe, Oo, Hindi, Hindi ko alam…"
+                            autoComplete="off"
+                            aria-label="Type your yes or no answer"
+                          />
+                          <div className="row">
+                            <button
+                              type="button"
+                              className="primary"
+                              disabled={!typedAnswer.trim()}
+                              onClick={() => {
+                                const parsed = parseAnswerFromSpeech(typedAnswer);
+                                if (!parsed) {
+                                  window.alert("Try yes, no, not sure — or Oo, Hindi, Hindi ko alam.");
+                                  return;
+                                }
+                                socket.emit(SOCKET_EVENTS.answer, { value: parsed });
+                                setTypedAnswer("");
+                              }}
+                            >
+                              Send typed answer
+                            </button>
+                          </div>
+                        </div>
+                        <div className="row answerRow">
+                          <button type="button" className="primary answerBtn" onClick={() => socket.emit(SOCKET_EVENTS.answer, { value: "yes" })}>
+                            {view.answerLabels.yes}
+                          </button>
+                          <button type="button" className="primary answerBtn" onClick={() => socket.emit(SOCKET_EVENTS.answer, { value: "no" })}>
+                            {view.answerLabels.no}
+                          </button>
+                          <button type="button" className="primary answerBtn" onClick={() => socket.emit(SOCKET_EVENTS.answer, { value: "not_sure" })}>
+                            {view.answerLabels.not_sure}
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {view.phase === "playing" && view.difficulty === "hard" ? (
+                  <div className="card card--panel card--panelDense stack">
+                    <h2 className="panelTitle panelTitle--compact">Voice duel</h2>
+                    <div className="muted muted--tight">
+                      Live voice goes through the call above. To lock in a round, send a <strong>short voice clip</strong> straight to your friend (peer‑to‑peer) — no speech‑to‑text — or tap “I’m done asking” if you only used the live mic.
+                    </div>
+                    {isAsker ? (
                       <div className="row">
+                        <button type="button" className="primary" onClick={() => socket.emit(SOCKET_EVENTS.askQuestion, { text: "" })}>
+                          I’m done asking
+                        </button>
                         <button
                           type="button"
-                          className="primary"
-                          disabled={!questionText.trim()}
-                          onClick={() => {
-                            const t = questionText.trim();
-                            if (!t) return;
-                            socket.emit(SOCKET_EVENTS.askQuestion, { text: t });
-                            setQuestionText("");
+                          disabled={speechBusy || !hardVoiceDcOpen}
+                          onClick={async () => {
+                            if (!voiceCallRef.current?.isVoiceClipReady()) return;
+                            setSpeechBusy(true);
+                            try {
+                              const blob = await recordVoiceClipAutoStop(14_000);
+                              if (blob.size < 400) {
+                                window.alert("That clip was too tiny — try again a little louder.");
+                                return;
+                              }
+                              socket.emit(SOCKET_EVENTS.askQuestion, { text: "" });
+                              await voiceCallRef.current.sendVoiceBlob(blob);
+                            } catch {
+                              window.alert("Couldn’t send the voice clip. Wait until the voice link says you’re in, then allow the mic.");
+                            }
+                            setSpeechBusy(false);
                           }}
                         >
-                          Send it!
-                        </button>
-                        <button type="button" disabled={speechBusy || !getSpeechRecognition()} onClick={onSpeechQuestion}>
-                          {speechBusy ? "Listening…" : "Say it out loud"}
+                          {speechBusy ? "Recording…" : "Record & send voice clip (~14s)"}
                         </button>
                       </div>
-                    </div>
-                  ) : isAnswerer ? (
-                    <div className="muted">Your spotlight — tap an answer and keep the drama going.</div>
-                  ) : (
-                    <WaitOpponent compact title="Their turn to ask" hint="They’re cooking up something sneaky." />
-                  )}
+                    ) : isAnswerer ? (
+                      <div className="muted muted--tight">Chat it out, then seal it with the big button:</div>
+                    ) : (
+                      <WaitOpponent compact title="Hold tight" hint="They’re warming up the voice chaos." />
+                    )}
+                    {isAnswerer ? (
+                      <button type="button" className="primary" disabled={speechBusy || !getSpeechRecognition()} onClick={onSpeechAnswerHard}>
+                        {speechBusy ? "Listening…" : "Shout your answer (Oo / Hindi / Hindi ko alam)"}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
 
-                  {isAnswerer ? (
-                    <div className="row answerRow">
-                      <button type="button" className="primary answerBtn" onClick={() => socket.emit(SOCKET_EVENTS.answer, { value: "yes" })}>
-                        {view.answerLabels.yes}
-                      </button>
-                      <button type="button" className="primary answerBtn" onClick={() => socket.emit(SOCKET_EVENTS.answer, { value: "no" })}>
-                        {view.answerLabels.no}
-                      </button>
-                      <button type="button" className="primary answerBtn" onClick={() => socket.emit(SOCKET_EVENTS.answer, { value: "not_sure" })}>
-                        {view.answerLabels.not_sure}
-                      </button>
+                {view.difficulty === "standard" && view.phase === "playing" ? (
+                  <details className="panelDetails">
+                    <summary className="panelDetails__summary">Question history</summary>
+                    <div className="history panelDetails__history">
+                      {view.qaHistory.length === 0 ? (
+                        <div className="historyEmpty muted">Nothing here yet — start roasting each other with questions and it fills up fast.</div>
+                      ) : null}
+                      {view.qaHistory.map((h, idx) => (
+                        <div key={idx} className="historyItem">
+                          <div>
+                            <span className="muted">{h.asker === view.yourSlot ? "You went" : "They went"}:</span> {h.questionText}
+                          </div>
+                          <div>
+                            <span className="muted">{h.asker === view.yourSlot ? "They said" : "You said"}:</span> {view.answerLabels[h.answer]}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ) : null}
-                </div>
-              ) : null}
+                  </details>
+                ) : null}
 
-              {view.phase === "playing" && view.difficulty === "hard" ? (
-                <div className="card card--panel stack">
-                  <h2 className="panelTitle">Voice duel</h2>
-                  <div className="muted">Yap on the call, read the room, then nudge the round forward with the buttons.</div>
-                  {isAsker ? (
+                {view.phase === "playing" ? (
+                  <div className="card card--panel card--panelDense stack">
+                    <h2 className="panelTitle panelTitle--compact">Call the shot</h2>
+                    <div className="muted muted--tight">Flip on guess mode, pick the face you dare call — wrong call and you’re toast.</div>
                     <div className="row">
-                      <button type="button" className="primary" onClick={() => socket.emit(SOCKET_EVENTS.askQuestion, { text: "" })}>
-                        I’m done asking
-                      </button>
                       <button
                         type="button"
-                        disabled={speechBusy || !getSpeechRecognition()}
-                        onClick={async () => {
-                          setSpeechBusy(true);
-                          try {
-                            const t = (await listenOnce("en-PH")).trim();
-                            socket.emit(SOCKET_EVENTS.askQuestion, { text: t });
-                          } catch {
-                            /* ignore */
-                          }
-                          setSpeechBusy(false);
+                        className="primary"
+                        disabled={!guessPick}
+                        onClick={() => {
+                          if (!guessPick) return;
+                          socket.emit(SOCKET_EVENTS.guess, { characterId: guessPick });
+                          setGuessPick(null);
+                          setGuessMode(false);
                         }}
                       >
-                        {speechBusy ? "Listening…" : "Toss in a voice note (optional)"}
+                        That’s my final answer!
                       </button>
+                      {guessPick ? <span className="muted">Locked on that one 👀</span> : null}
                     </div>
-                  ) : isAnswerer ? (
-                    <div className="muted">Chat it out, then seal it with the big button:</div>
-                  ) : (
-                    <WaitOpponent compact title="Hold tight" hint="They’re warming up the voice chaos." />
-                  )}
-                  {isAnswerer ? (
-                    <button type="button" className="primary" disabled={speechBusy || !getSpeechRecognition()} onClick={onSpeechAnswerHard}>
-                      {speechBusy ? "Listening…" : "Shout your answer (Oo / Hindi / Hindi ko alam)"}
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
+                  </div>
+                ) : null}
 
-              {view.difficulty === "standard" && view.phase === "playing" ? (
-                <div className="card card--panel stack">
-                  <h2 className="panelTitle">The replay</h2>
-                  <div className="history">
-                    {view.qaHistory.length === 0 ? (
-                      <div className="historyEmpty muted">Nothing here yet — start roasting each other with questions and it fills up fast.</div>
-                    ) : null}
-                    {view.qaHistory.map((h, idx) => (
-                      <div key={idx} className="historyItem">
-                        <div>
-                          <span className="muted">{h.asker === view.yourSlot ? "You went" : "They went"}:</span> {h.questionText}
-                        </div>
-                        <div>
-                          <span className="muted">{h.asker === view.yourSlot ? "They said" : "You said"}:</span>{" "}
-                          {view.answerLabels[h.answer]}
+                {view.phase === "ended" ? (
+                  <div className="card card--matchEnd stack">
+                    <h2 className="panelTitle panelTitle--end panelTitle--compact">Round’s over!</h2>
+                    <div>
+                      Bragging rights: <strong>{view.winner === view.yourSlot ? "You!" : "Them!"}</strong>
+                    </div>
+                    {view.reveal ? (
+                      <div className="muted muted--tight">
+                        Both secret faces are spilled — check your wall for the receipts.
+                        <div style={{ fontSize: "0.85rem", marginTop: 6, opacity: 0.85 }}>
+                          {view.reveal.p1SecretId} · {view.reveal.p2SecretId}
                         </div>
                       </div>
+                    ) : null}
+                    {view.lastGuess ? (
+                      <div className="muted muted--tight">
+                        Final swing was {view.lastGuess.correct ? "spot on" : "a miss"}.
+                      </div>
+                    ) : null}
+                    <button type="button" className="primary" disabled={rematchCount !== null} onClick={() => setRematchCount(3)}>
+                      {rematchCount !== null ? `Get ready… ${rematchCount}` : "Run it back!"}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="roomGameLayout__board">
+                <div className="boardStack stack">
+                  <h2 className="panelTitle boardStack__title">Your wall of faces</h2>
+                  <div className="row boardToolbar">
+                    <label className="row boardToolbar__guess" style={{ gap: 8 }}>
+                      <input type="checkbox" checked={guessMode} onChange={(e) => setGuessMode(e.target.checked)} />
+                      <span className="muted muted--tight">Guess mode — tap a face to lock a guess.</span>
+                    </label>
+                    {view.phase === "playing" && !guessMode ? (
+                      <button type="button" className="btn-ghost" disabled={flipUndo.length === 0} onClick={undoLastFlip}>
+                        Undo last flip
+                      </button>
+                    ) : null}
+                  </div>
+                  <p className="muted muted--tight boardStack__hint">Off guess mode? Tap tiles to flip faces you’ve ruled out.</p>
+                  <div className="grid24 grid24--game">
+                    {view.roster.map((c) => (
+                      <AvatarTile key={c.id} character={c} down={Boolean(localDown[c.id])} isSelf={mySecretId === c.id} onClick={() => onTileClick(c.id)} />
                     ))}
                   </div>
                 </div>
-              ) : null}
-
-              <h2 className="panelTitle">Your wall of faces</h2>
-              <div className="row" style={{ marginBottom: 8 }}>
-                <label className="row" style={{ gap: 8 }}>
-                  <input type="checkbox" checked={guessMode} onChange={(e) => setGuessMode(e.target.checked)} />
-                  <span className="muted">Guess mode — flip this on, tap a face, go for glory.</span>
-                </label>
-                {view.phase === "playing" && !guessMode ? (
-                  <button type="button" className="btn-ghost" disabled={flipUndo.length === 0} onClick={undoLastFlip}>
-                    Undo last flip
-                  </button>
-                ) : null}
               </div>
-              <div className="muted">Off guess mode? Tap tiles to flip faces you’ve ruled out.</div>
-              <div className="grid24">
-                {view.roster.map((c) => (
-                  <AvatarTile key={c.id} character={c} down={Boolean(localDown[c.id])} isSelf={mySecretId === c.id} onClick={() => onTileClick(c.id)} />
-                ))}
-              </div>
-
-              {view.phase === "playing" ? (
-                <div className="card card--panel stack">
-                  <h2 className="panelTitle">Call the shot</h2>
-                  <div className="muted">Flip on guess mode, pick the face you dare call — wrong call and you’re toast.</div>
-                  <div className="row">
-                    <button
-                      type="button"
-                      className="primary"
-                      disabled={!guessPick}
-                      onClick={() => {
-                        if (!guessPick) return;
-                        socket.emit(SOCKET_EVENTS.guess, { characterId: guessPick });
-                        setGuessPick(null);
-                        setGuessMode(false);
-                      }}
-                    >
-                      That’s my final answer!
-                    </button>
-                    {guessPick ? <span className="muted">Locked on that one 👀</span> : null}
-                  </div>
-                </div>
-              ) : null}
-
-              {view.phase === "ended" ? (
-                <div className="card card--matchEnd stack">
-                  <h2 className="panelTitle panelTitle--end">Round’s over!</h2>
-                  <div>
-                    Bragging rights: <strong>{view.winner === view.yourSlot ? "You!" : "Them!"}</strong>
-                  </div>
-                  {view.reveal ? (
-                    <div className="muted">
-                      Both secret faces are spilled — scroll your boards if you want the receipts.
-                      <div style={{ fontSize: "0.85rem", marginTop: 6, opacity: 0.85 }}>
-                        {view.reveal.p1SecretId} · {view.reveal.p2SecretId}
-                      </div>
-                    </div>
-                  ) : null}
-                  {view.lastGuess ? (
-                    <div className="muted">
-                      Final swing was {view.lastGuess.correct ? "spot on" : "a miss"}.
-                    </div>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="primary"
-                    disabled={rematchCount !== null}
-                    onClick={() => setRematchCount(3)}
-                  >
-                    {rematchCount !== null ? `Get ready… ${rematchCount}` : "Run it back!"}
-                  </button>
-                </div>
-              ) : null}
             </div>
           ) : null}
         </div>
