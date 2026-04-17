@@ -43,6 +43,16 @@ export function App() {
   const [socket] = useState(() => createSocket());
   const { view, error, resetRoom } = useRoomState(socket);
 
+  /** One-shot landing intro; skipped when user prefers reduced motion. */
+  const [bootIntro, setBootIntro] = useState(
+    () => typeof window !== "undefined" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+  useEffect(() => {
+    if (!bootIntro) return;
+    const id = window.setTimeout(() => setBootIntro(false), 1500);
+    return () => window.clearTimeout(id);
+  }, [bootIntro]);
+
   const [themeId, setThemeId] = useState<ThemeId>("cartoons");
   const [difficulty, setDifficulty] = useState<Difficulty>("standard");
   const [joinCode, setJoinCode] = useState("");
@@ -141,19 +151,31 @@ export function App() {
   const connected = socket.connected;
 
   return (
-    <div className="appShell">
-      <header className="card" style={{ marginBottom: 14 }}>
-        <h1>Sino Ito?</h1>
-        <div className="muted">Filipino-flavored Guess Who — online, procedural art, two players.</div>
+    <div className={`appShell${bootIntro ? " appShell--boot" : ""}`}>
+      <div className="appShell__decor" aria-hidden="true">
+        <span className="appShell__blob appShell__blob--a" />
+        <span className="appShell__blob appShell__blob--b" />
+        <span className="appShell__blob appShell__blob--c" />
+      </div>
+
+      <header className="card card--hero brandHero">
+        <p className="brandHero__eyebrow">Online · 2 players</p>
+        <h1 className="brandHero__title">Sino Ito?</h1>
+        <p className="brandHero__tagline">Filipino-flavored Guess Who — procedural art, room codes, optional voice in Hard mode.</p>
       </header>
 
       {error ? (
-        <div className="card" style={{ borderColor: "#7f1d1d", marginBottom: 12 }}>
-          <strong>Error:</strong> {error}
+        <div className="card card--alert stack" style={{ marginBottom: 12 }}>
+          <strong>Oops!</strong> {error}
         </div>
       ) : null}
 
-      {!connected ? <div className="card muted">Connecting to server…</div> : null}
+      {!connected ? (
+        <div className="card card--connecting">
+          <span className="connecting__dot" aria-hidden />
+          Connecting to server…
+        </div>
+      ) : null}
 
       {connected && view?.yourSlot ? (
         <div className="card stack" style={{ marginBottom: 12 }}>
@@ -169,23 +191,35 @@ export function App() {
           </div>
 
           {view.phase === "lobby" && !view.opponentPresent ? (
-            <div className="stack">
-              <div>
-                <div className="muted">Share this link with a friend:</div>
-                <div className="row">
-                  <input readOnly value={joinLink} style={{ flex: 1, minWidth: 220 }} />
-                  <button
-                    type="button"
-                    className="primary"
-                    onClick={async () => {
-                      await navigator.clipboard.writeText(joinLink);
-                    }}
-                  >
-                    Copy link
-                  </button>
-                </div>
+            <div className="stack lobbyShare">
+              <p className="muted lobbyShare__hint">Tell your friend to open this same game, then enter this room code:</p>
+              <div className="roomCodeDisplay" aria-label="Room code">
+                <span className="roomCodeDisplay__chars">{view.roomCode}</span>
               </div>
-              <div className="muted">Waiting for opponent to join…</div>
+              <div className="row lobbyShare__actions">
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(view.roomCode);
+                  }}
+                >
+                  Copy code
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(joinLink);
+                  }}
+                >
+                  Copy invite link
+                </button>
+              </div>
+              <p className="muted lobbyShare__fineprint">
+                Invite link opens the site with the code filled in — optional if you only share the six characters.
+              </p>
+              <div className="muted lobbyShare__wait">Waiting for opponent to join…</div>
             </div>
           ) : null}
 
@@ -384,8 +418,8 @@ export function App() {
       ) : null}
 
       {connected && !view?.yourSlot ? (
-        <div className="card stack">
-          <h2>Play</h2>
+        <div className="card card--play stack playPanel">
+          <h2 className="playPanel__title">Play</h2>
           <div className="row">
             <label className="muted">Theme</label>
             <select value={themeId} onChange={(e) => setThemeId(e.target.value as ThemeId)}>
