@@ -210,6 +210,15 @@ export function App() {
     return "Their turn to ask";
   }, [view, isAnswerer, isPendingAsker]);
 
+  /** Exactly one face still up on your wall — treat as implicit guess target. */
+  const soleSurvivorId = useMemo(() => {
+    if (!view?.roster) return null;
+    const up = view.roster.filter((c) => !localDown[c.id]);
+    return up.length === 1 ? up[0]!.id : null;
+  }, [view?.roster, localDown]);
+
+  const effectiveGuessPick = guessPick ?? soleSurvivorId;
+
   async function copyDebugInfo() {
     const payload = {
       origin: window.location.origin,
@@ -304,21 +313,21 @@ export function App() {
       setGuessPick(characterId);
       return;
     }
+    if (view.phase === "playing") {
+      const up = view.roster.filter((c) => !localDown[c.id]);
+      if (up.length === 1 && up[0]!.id === characterId) {
+        setGuessMode(true);
+        setGuessPick(characterId);
+        return;
+      }
+    }
     toggleDown(characterId);
   }
 
   const connected = socket.connected;
-  const gameFitLayout = Boolean(
-    connected && view?.yourSlot && (view.phase === "setup" || view.phase === "playing" || view.phase === "ended"),
-  );
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("game-no-scroll", gameFitLayout);
-    return () => document.documentElement.classList.remove("game-no-scroll");
-  }, [gameFitLayout]);
 
   return (
-    <div className={`appShell${bootIntro ? " appShell--boot" : ""}${gameFitLayout ? " appShell--game" : ""}`}>
+    <div className={`appShell${bootIntro ? " appShell--boot" : ""}`}>
       <OnboardingModal open={showOnboarding} onClose={() => setShowOnboarding(false)} />
       <ConfettiLayer tick={confettiTick} />
       <div className="appShell__decor" aria-hidden="true">
@@ -327,7 +336,7 @@ export function App() {
         <span className="appShell__blob appShell__blob--c" />
       </div>
 
-      <header className={`card card--hero brandHero${gameFitLayout ? " brandHero--compact" : ""}`}>
+      <header className="card card--hero brandHero">
         <p className="brandHero__eyebrow">Play with a friend · online</p>
         <h1 className="brandHero__title">Kinsa Siya?</h1>
         <p className="brandHero__tagline">Silly faces, secret picks, big brain questions — one of you walks away bragging.</p>
@@ -346,7 +355,7 @@ export function App() {
       ) : null}
 
       {connected && view?.yourSlot ? (
-        <div className={`card card--room stack${gameFitLayout ? " card--room--fit" : ""}`}>
+        <div className="card card--room stack">
           <div className="roomBar row">
             <div className="roomBar__badges row">
               <span className="badge badge--glow">Room {view.roomCode}</span>{" "}
@@ -646,22 +655,25 @@ export function App() {
                 {view.phase === "playing" ? (
                   <div className="card card--panel card--panelDense stack">
                     <h2 className="panelTitle panelTitle--compact">Call the shot</h2>
-                    <div className="muted muted--tight">Flip on guess mode, pick the face you dare call — wrong call and you’re toast.</div>
+                    <div className="muted muted--tight">
+                      Final guesses only on <strong>your turn</strong> (when it’s your turn to ask and no question is waiting). Turn on guess
+                      mode to tap a face, or if only one face is still up it’s picked for you automatically.
+                    </div>
                     <div className="row">
                       <button
                         type="button"
                         className="primary"
-                        disabled={!guessPick}
+                        disabled={!isAsker || !effectiveGuessPick}
                         onClick={() => {
-                          if (!guessPick) return;
-                          socket.emit(SOCKET_EVENTS.guess, { characterId: guessPick });
+                          if (!isAsker || !effectiveGuessPick) return;
+                          socket.emit(SOCKET_EVENTS.guess, { characterId: effectiveGuessPick });
                           setGuessPick(null);
                           setGuessMode(false);
                         }}
                       >
                         That’s my final answer!
                       </button>
-                      {guessPick ? <span className="muted">Locked on that one 👀</span> : null}
+                      {effectiveGuessPick ? <span className="muted">Locked on that one 👀</span> : null}
                     </div>
                   </div>
                 ) : null}
@@ -696,9 +708,14 @@ export function App() {
                 <div className="boardStack stack">
                   <h2 className="panelTitle boardStack__title">Your wall of faces</h2>
                   <div className="row boardToolbar">
-                    <label className="row boardToolbar__guess" style={{ gap: 8 }}>
-                      <input type="checkbox" checked={guessMode} onChange={(e) => setGuessMode(e.target.checked)} />
-                      <span className="muted muted--tight">Guess mode — tap a face to lock a guess.</span>
+                    <label className="row boardToolbar__guess" style={{ gap: 12 }}>
+                      <input
+                        type="checkbox"
+                        className="boardToolbar__checkbox"
+                        checked={guessMode}
+                        onChange={(e) => setGuessMode(e.target.checked)}
+                      />
+                      <span className="boardStack__guessLabel">Guess mode — tap a face to lock a guess.</span>
                     </label>
                     {view.phase === "playing" && !guessMode ? (
                       <button type="button" className="btn-ghost" disabled={flipUndo.length === 0} onClick={undoLastFlip}>
@@ -706,10 +723,17 @@ export function App() {
                       </button>
                     ) : null}
                   </div>
-                  <p className="muted muted--tight boardStack__hint">Off guess mode? Tap tiles to flip faces you’ve ruled out.</p>
+                  <p className="boardStack__hint">Off guess mode? Tap tiles to flip faces you’ve ruled out.</p>
                   <div className="grid24 grid24--game">
                     {view.roster.map((c) => (
-                      <AvatarTile key={c.id} character={c} down={Boolean(localDown[c.id])} isSelf={mySecretId === c.id} onClick={() => onTileClick(c.id)} />
+                      <AvatarTile
+                        key={c.id}
+                        character={c}
+                        down={Boolean(localDown[c.id])}
+                        isSelf={mySecretId === c.id}
+                        lockedGuess={view.phase === "playing" && effectiveGuessPick === c.id}
+                        onClick={() => onTileClick(c.id)}
+                      />
                     ))}
                   </div>
                 </div>

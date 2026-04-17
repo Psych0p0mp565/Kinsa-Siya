@@ -54,6 +54,23 @@ function err(socket: Socket, message: string) {
   socket.emit(SOCKET_EVENTS.error, { message });
 }
 
+function guessErrorMessage(reason: string): string {
+  switch (reason) {
+    case "not_playing":
+      return "The match is not in play yet.";
+    case "not_your_turn":
+      return "You can only call a final guess on your turn (when it’s your turn to ask).";
+    case "answer_pending":
+      return "Wait until they answer your question before you guess.";
+    case "bad_character":
+      return "That face isn’t on the board.";
+    case "no_secret":
+      return "Secrets aren’t ready yet.";
+    default:
+      return reason;
+  }
+}
+
 function askQuestionErrorMessage(reason: string): string {
   switch (reason) {
     case "not_playing":
@@ -134,7 +151,7 @@ io.on("connection", (socket: Socket) => {
     const slot = room.slotFor(socket.id);
     if (!slot) return err(socket, "No seat.");
     const res = room.guess(slot, String(payload?.characterId ?? ""));
-    if (!res.ok) return err(socket, res.reason);
+    if (!res.ok) return err(socket, guessErrorMessage(res.reason));
     broadcastRoom(room);
   });
 

@@ -140,6 +140,8 @@ export class Room {
 
   guess(slot: PlayerSlot, characterId: string): { ok: true; outcome: "win" | "lose" } | { ok: false; reason: string } {
     if (this.phase !== "playing") return { ok: false, reason: "not_playing" };
+    if (this.turn !== slot) return { ok: false, reason: "not_your_turn" };
+    if (this.pendingQuestion) return { ok: false, reason: "answer_pending" };
     if (!this.roster.some((c) => c.id === characterId)) return { ok: false, reason: "bad_character" };
     const opp = this.opponentSlot(slot);
     const target = this.secrets[opp];

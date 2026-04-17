@@ -479,6 +479,16 @@ body::before {
   box-shadow: 0 0 0 2px #451a03, 0 6px 0 rgba(0, 0, 0, 0.25);
 }
 
+.tile.tile--guessPick:not(.down) {
+  outline: 4px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.4), 0 6px 0 rgba(0, 0, 0, 0.25);
+}
+
+.tile.self.tile--guessPick:not(.down) {
+  outline-color: var(--accent-hot);
+}
+
 .tileName {
   font-size: 11px;
   font-weight: 600;
@@ -979,119 +989,44 @@ button.btn-ghost:active:not(:disabled) {
   animation: twinkle 1.4s ease-in-out infinite;
 }
 
-/* —— One-screen in-room layout (setup / play / end) + mobile —— */
-html.game-no-scroll,
-html.game-no-scroll body {
-  height: 100%;
-  overflow: hidden;
-  overscroll-behavior: none;
-}
-
-html.game-no-scroll #root {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.appShell--game {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 6px 10px calc(10px + env(safe-area-inset-bottom, 0px));
-  padding-top: calc(6px + env(safe-area-inset-top, 0px));
-  overflow: hidden;
-}
-
-.appShell--game .card--hero {
-  margin-bottom: 8px;
-  flex-shrink: 0;
-}
-
-.card--hero.brandHero--compact {
-  padding: 10px 16px;
-}
-
-.brandHero--compact .brandHero__eyebrow {
-  font-size: 0.72rem;
-  margin: 0 0 4px;
-}
-
-.brandHero--compact .brandHero__title {
-  font-size: clamp(1.25rem, 4.5vw, 1.65rem);
-  margin: 0;
-}
-
-.brandHero--compact .brandHero__tagline {
-  display: none;
-}
-
-.appShell--game > .card--room.card--room--fit {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.card--room--fit.stack {
-  gap: 8px;
-}
-
-.card--room--fit .roomBar {
-  padding-bottom: 8px;
-  margin-bottom: 2px;
-}
-
-.card--room--fit .turnStrip {
-  margin-bottom: 8px;
-  padding: 8px 12px;
-  font-size: 0.9rem;
-}
-
+/* —— In-room: two columns on wide viewports; natural page scroll —— */
 .roomGameLayout {
   display: grid;
-  grid-template-columns: minmax(200px, 300px) minmax(0, 1fr);
-  gap: 10px;
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-  align-items: stretch;
+  grid-template-columns: minmax(200px, 320px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
 }
 
 .roomGameLayout__rail {
   min-width: 0;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  padding-right: 2px;
 }
 
 .roomGameLayout__board {
   min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
 }
 
 .boardStack.stack {
-  gap: 6px;
+  gap: 10px;
 }
 
-.boardStack__title {
-  margin: 0 !important;
-  font-size: clamp(1rem, 2.5vw, 1.2rem);
+.panelTitle.boardStack__title {
+  margin: 0 0 4px !important;
+  font-size: clamp(1.35rem, 3.5vw, 1.85rem);
   flex-shrink: 0;
 }
 
 .boardToolbar {
   margin: 0;
   flex-shrink: 0;
+  align-items: center;
+}
+
+.boardToolbar__checkbox {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 .boardToolbar__guess {
@@ -1099,21 +1034,26 @@ html.game-no-scroll #root {
   min-width: 0;
 }
 
+.boardStack__guessLabel {
+  font-size: clamp(1.05rem, 2.8vw, 1.28rem);
+  line-height: 1.4;
+  font-weight: 600;
+  color: #f5f0ff;
+}
+
 .boardStack__hint {
   margin: 0;
   flex-shrink: 0;
-  font-size: 0.82rem;
-  line-height: 1.35;
+  font-size: clamp(0.98rem, 2.4vw, 1.15rem);
+  line-height: 1.45;
+  font-weight: 500;
+  color: var(--muted);
 }
 
 .grid24--game {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
   align-content: start;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 
 .grid24--game .tileName {
@@ -1220,21 +1160,11 @@ html.game-no-scroll #root {
   .roomGameLayout {
     display: flex;
     flex-direction: column;
-    flex: 1;
-    min-height: 0;
-    gap: 8px;
+    gap: 12px;
   }
 
   .roomGameLayout__board {
-    flex: 1 1 auto;
-    min-height: 0;
     order: -1;
-  }
-
-  .roomGameLayout__rail {
-    flex: 0 1 auto;
-    max-height: min(42dvh, 340px);
-    overflow-y: auto;
   }
 }
 

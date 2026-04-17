@@ -5,11 +5,14 @@ export function AvatarTile({
   character,
   down,
   isSelf,
+  lockedGuess,
   onClick,
 }: {
   character: Character;
   down: boolean;
   isSelf: boolean;
+  /** Highlight when this face is the locked final guess (picked or sole survivor). */
+  lockedGuess?: boolean;
   onClick: () => void;
 }) {
   const [imgOk, setImgOk] = useState(() => Boolean(character.portraitUrl));
@@ -21,7 +24,11 @@ export function AvatarTile({
   const showPhoto = Boolean(character.portraitUrl && imgOk);
 
   return (
-    <button type="button" className={`tile ${down ? "down" : ""} ${isSelf ? "self" : ""}`} onClick={onClick}>
+    <button
+      type="button"
+      className={`tile ${down ? "down" : ""} ${isSelf ? "self" : ""} ${lockedGuess ? "tile--guessPick" : ""}`}
+      onClick={onClick}
+    >
       {showPhoto ? (
         <img
           className="tilePortrait"
