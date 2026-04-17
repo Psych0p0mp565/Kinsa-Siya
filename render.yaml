@@ -1,0 +1,18 @@
+# Render Blueprint — deploy the Socket.IO game API.
+# https://render.com/docs/blueprint-spec
+#
+# After deploy, set CLIENT_ORIGINS in the Render dashboard to your real UI origin(s),
+# e.g. https://your-app.onrender.com or https://pages.dev/...
+
+services:
+  - type: web
+    name: sino-ito-api
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm run render:build
+    startCommand: npm run render:start
+    healthCheckPath: /health
+    envVars:
+      - key: CLIENT_ORIGINS
+        sync: false
